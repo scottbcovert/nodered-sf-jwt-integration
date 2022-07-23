@@ -1,0 +1,235 @@
+[
+    {
+        "id": "420a0ced4c7904b6",
+        "type": "tab",
+        "label": "Get Salesforce Users",
+        "disabled": false,
+        "info": "Queries for Salesforce users via the API through the OAuth2 JWT bearer flow, which is ideal for server-to-server integrations",
+        "env": []
+    },
+    {
+        "id": "c4ee4324a874d350",
+        "type": "function",
+        "z": "420a0ced4c7904b6",
+        "name": "createJWT",
+        "func": "const config = msg.payload;\nconst header = { alg: 'RS256' };\nconst claimsSet = {\n  iss: config.CLIENT_ID,\n  sub: config.USERNAME,\n  aud: config.LOGIN_URL,\n  exp: Math.floor(Date.now() / 1000) + 60 * 5\n};\nconst b64Encode = function(str) {\n    return Buffer.from(str).toString('base64url');\n};\nconst encodedJWTHeader = b64Encode(JSON.stringify(header));\nconst encodedJWTClaimsSet = b64Encode(JSON.stringify(claimsSet));\nconst jwtPartOne = encodedJWTHeader + '.' + encodedJWTClaimsSet;\nconst sign = crypto.createSign('RSA-SHA256');\nsign.update(jwtPartOne);\nsign.end();\nconst jwtPartTwo = b64Encode(sign.sign(config.PRIVATE_KEY));\nconst jwt = jwtPartOne + '.' + jwtPartTwo;\nconst data = {\n    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',\n    assertion: jwt\n};\nlet body = [];\nfor (let i=0, keys=Object.keys(data); i<keys.length; i++) {\n    let k = encodeURIComponent(keys[i]);\n    let v = encodeURIComponent(data[k]);\n    body.push(k + '=' + v);\n}\nbody = body.join('&');\nmsg = {\n    method: 'POST',\n    url: config.LOGIN_URL + '/services/oauth2/token',\n    headers: {\n        'Content-Type': 'application/x-www-form-urlencoded',\n        'Content-Length': body.length\n    },\n    payload: body\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "crypto",
+                "module": "crypto"
+            }
+        ],
+        "x": 230,
+        "y": 100,
+        "wires": [
+            [
+                "f8945dc999b4af6c"
+            ]
+        ]
+    },
+    {
+        "id": "f8945dc999b4af6c",
+        "type": "http request",
+        "z": "420a0ced4c7904b6",
+        "name": "getAccessToken",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "body",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "senderr": false,
+        "x": 400,
+        "y": 100,
+        "wires": [
+            [
+                "79d5678c9eb3a6a1"
+            ]
+        ]
+    },
+    {
+        "id": "f439e1683ba018c4",
+        "type": "inject",
+        "z": "420a0ced4c7904b6",
+        "name": "setConfig",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "300",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"CLIENT_ID\":\"CONSUMER_KEY\",\"LOGIN_URL\":\"https://login.salesforce.com\",\"USERNAME\":\"SAMPLE_USERNAME\",\"PRIVATE_KEY\":\"-----BEGIN RSA PRIVATE KEY-----\\nKEY_EXAMPLE_LINE_1\\nKEY_EXAMPLE_LINE_2\\nKEY_EXAMPLE_LINE_3\\nKEY_EXAMPLE_LINE_4\\nKEY_EXAMPLE_LINE_5\\nKEY_EXAMPLE_LINE_6\\nKEY_EXAMPLE_LINE_7\\nKEY_EXAMPLE_LINE_8\\nKEY_EXAMPLE_LINE_9\\nKEY_EXAMPLE_LINE_10\\nKEY_EXAMPLE_LINE_11\\nKEY_EXAMPLE_LINE_12\\nKEY_EXAMPLE_LINE_13\\nKEY_EXAMPLE_LINE_14\\nKEY_EXAMPLE_LINE_15\\nKEY_EXAMPLE_LINE_16\\nKEY_EXAMPLE_LINE_17\\nKEY_EXAMPLE_LINE_18\\nKEY_EXAMPLE_LINE_19\\nKEY_EXAMPLE_LINE_20\\nKEY_EXAMPLE_LINE_21\\nKEY_EXAMPLE_LINE_22\\nKEY_EXAMPLE_LINE_23\\nKEY_EXAMPLE_LINE_24\\nKEY_EXAMPLE_LINE_25\\n-----END RSA PRIVATE KEY-----\\n\"}",
+        "payloadType": "json",
+        "x": 70,
+        "y": 100,
+        "wires": [
+            [
+                "c4ee4324a874d350"
+            ]
+        ]
+    },
+    {
+        "id": "79d5678c9eb3a6a1",
+        "type": "change",
+        "z": "420a0ced4c7904b6",
+        "name": "setAuthInfo",
+        "rules": [
+            {
+                "t": "set",
+                "p": "access_token",
+                "pt": "flow",
+                "to": "payload.access_token",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "instance_url",
+                "pt": "flow",
+                "to": "payload.instance_url",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 100,
+        "wires": [
+            [
+                "dd4bc3b51ce5e764"
+            ]
+        ]
+    },
+    {
+        "id": "c259e2553db6e767",
+        "type": "function",
+        "z": "420a0ced4c7904b6",
+        "name": "createUsersRequest",
+        "func": "const query_path = '/services/data/v54.0/query?q=';\nconst query = encodeURIComponent('SELECT Id, Name, Email FROM User');\nmsg = {\n    method: 'GET',\n    url: flow.get('instance_url') + query_path + query,\n    headers: {\n        'Content-Type': 'application/json',\n        'Authorization': 'Bearer ' + flow.get('access_token')\n    }\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 280,
+        "y": 180,
+        "wires": [
+            [
+                "8141d9be9fcc6f2c"
+            ]
+        ]
+    },
+    {
+        "id": "8141d9be9fcc6f2c",
+        "type": "http request",
+        "z": "420a0ced4c7904b6",
+        "name": "getUsers",
+        "method": "use",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "senderr": false,
+        "x": 460,
+        "y": 180,
+        "wires": [
+            [
+                "450e67b0e3ea6a23"
+            ]
+        ]
+    },
+    {
+        "id": "8894f59f73c4c700",
+        "type": "debug",
+        "z": "420a0ced4c7904b6",
+        "name": "Debug Users",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 770,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "450e67b0e3ea6a23",
+        "type": "change",
+        "z": "420a0ced4c7904b6",
+        "name": "setUsers",
+        "rules": [
+            {
+                "t": "set",
+                "p": "users",
+                "pt": "flow",
+                "to": "payload.users",
+                "tot": "msg",
+                "dc": true
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 620,
+        "y": 180,
+        "wires": [
+            [
+                "8894f59f73c4c700"
+            ]
+        ]
+    },
+    {
+        "id": "b01b7c3a989ab511",
+        "type": "complete",
+        "z": "420a0ced4c7904b6",
+        "name": "isAuthorized",
+        "scope": [
+            "79d5678c9eb3a6a1"
+        ],
+        "uncaught": false,
+        "x": 70,
+        "y": 180,
+        "wires": [
+            [
+                "c259e2553db6e767"
+            ]
+        ]
+    },
+    {
+        "id": "dd4bc3b51ce5e764",
+        "type": "debug",
+        "z": "420a0ced4c7904b6",
+        "name": "Debug Auth Info",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 760,
+        "y": 100,
+        "wires": []
+    }
+]

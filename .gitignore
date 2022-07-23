@@ -1,0 +1,5 @@
+myNodeRedData/*
+!myNodeRedData/flows.json
+!myNodeRedData/settings.js
+node_modules
+.env

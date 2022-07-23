@@ -1,0 +1,11 @@
+{
+  "name": "nodered-sf-jwt-integration",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node $NODE_OPTIONS node_modules/node-red/red.js $FLOWS"
+  },
+  "author": "Tython",
+  "dependencies": {
+    "node-red": "2.2.2"
+  }
+}
